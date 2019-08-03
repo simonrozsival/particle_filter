@@ -50,6 +50,7 @@ class ParticleFiler():
         self.RANGELIB_VAR      = int(rospy.get_param("~rangelib_variant", "3"))
         self.SHOW_FINE_TIMING  = bool(rospy.get_param("~fine_timing", "0"))
         self.PUBLISH_ODOM      = bool(rospy.get_param("~publish_odom", "1"))
+        self.PUBLISH_TF        = bool(rospy.get_param("~publish_tf", "1"))
         self.DO_VIZ            = bool(rospy.get_param("~viz"))
 
         # sensor model constants
@@ -170,8 +171,9 @@ class ParticleFiler():
             stamp = rospy.Time.now()
 
         # this may cause issues with the TF tree. If so, see the below code.
-        self.pub_tf.sendTransform((pose[0],pose[1],0),tf.transformations.quaternion_from_euler(0, 0, pose[2]), 
-               stamp , "/laser", "/map")
+        if self.PUBLISH_TF:
+            self.pub_tf.sendTransform((pose[0],pose[1],0),tf.transformations.quaternion_from_euler(0, 0, pose[2]), 
+                   stamp , "/laser", "/map")
 
         # also publish odometry to facilitate getting the localization pose
         if self.PUBLISH_ODOM:
@@ -194,16 +196,17 @@ class ParticleFiler():
         a "map" -> "base_link" transform as to not break the TF tree.
         """
 
-        # Get map -> laser transform.
-        map_laser_pos = np.array( (pose[0],pose[1],0) )
-        map_laser_rotation = np.array( tf.transformations.quaternion_from_euler(0, 0, pose[2]) )
-        # Apply laser -> base_link transform to map -> laser transform
-        # This gives a map -> base_link transform
-        laser_base_link_offset = (0.265, 0, 0)
-        map_laser_pos -= np.dot(tf.transformations.quaternion_matrix(tf.transformations.unit_vector(map_laser_rotation))[:3,:3], laser_base_link_offset).T
+        if self.PUBLISH_TF:
+            # Get map -> laser transform.
+            map_laser_pos = np.array( (pose[0],pose[1],0) )
+            map_laser_rotation = np.array( tf.transformations.quaternion_from_euler(0, 0, pose[2]) )
+            # Apply laser -> base_link transform to map -> laser transform
+            # This gives a map -> base_link transform
+            laser_base_link_offset = (0.265, 0, 0)
+            map_laser_pos -= np.dot(tf.transformations.quaternion_matrix(tf.transformations.unit_vector(map_laser_rotation))[:3,:3], laser_base_link_offset).T
 
-        # Publish transform
-        self.pub_tf.sendTransform(map_laser_pos, map_laser_rotation, stamp , "/base_link", "/map")
+            # Publish transform
+            self.pub_tf.sendTransform(map_laser_pos, map_laser_rotation, stamp , "/base_link", "/map")
 
     def visualize(self):
         '''
